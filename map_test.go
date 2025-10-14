@@ -4,6 +4,7 @@ import (
 	"math"
 	"math/rand"
 	"runtime"
+	"slices"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -2068,6 +2069,66 @@ func TestToPlainMap(t *testing.T) {
 		if v := pm[i]; v != i {
 			t.Fatalf("unexpected value for key %d: %d", i, v)
 		}
+	}
+}
+
+func TestMapRangeIterationOrder(t *testing.T) {
+	const numEntries = 10000
+	m := NewMap[string, int]()
+
+	for i := range numEntries {
+		m.Store(strconv.Itoa(i), i)
+	}
+
+	// Do multiple Range iterations and store the first key of each iteration
+	var keys []string
+	for i := 0; i < 10; i++ {
+		m.Range(func(key string, _ int) bool {
+			keys = append(keys, key)
+			return false
+		})
+	}
+
+	if len(keys) != 10 {
+		t.Fatalf("expected 10 keys, got %d", len(keys))
+	}
+
+	// Sort and compact the keys slice to find the unique keys
+	slices.Sort(keys)
+	keys = slices.Compact(keys)
+
+	if len(keys) == 1 {
+		t.Fatal("iteration order is deterministic")
+	}
+}
+
+func TestMapRangeRelaxedIterationOrder(t *testing.T) {
+	const numEntries = 10000
+	m := NewMap[string, int]()
+
+	for i := range numEntries {
+		m.Store(strconv.Itoa(i), i)
+	}
+
+	// Do multiple Range iterations and store the first key of each iteration
+	var keys []string
+	for i := 0; i < 10; i++ {
+		m.RangeRelaxed(func(key string, _ int) bool {
+			keys = append(keys, key)
+			return false
+		})
+	}
+
+	if len(keys) != 10 {
+		t.Fatalf("expected 10 keys, got %d", len(keys))
+	}
+
+	// Sort and compact the keys slice to find the unique keys
+	slices.Sort(keys)
+	keys = slices.Compact(keys)
+
+	if len(keys) == 1 {
+		t.Fatal("iteration order is deterministic")
 	}
 }
 

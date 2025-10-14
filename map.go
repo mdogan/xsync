@@ -6,6 +6,7 @@ import (
 	"iter"
 	"math"
 	"math/bits"
+	"math/rand/v2"
 	"runtime"
 	"strings"
 	"sync"
@@ -979,8 +980,13 @@ func (m *Map[K, V]) Range(f func(key K, value V) bool) {
 	// Pre-allocate array big enough to fit entries for most hash tables.
 	bentries := make([]*entry[K, V], 0, 16*entriesPerMapBucket)
 	table := m.table.Load()
-	for i := range table.buckets {
-		rootb := &table.buckets[i]
+
+	bucketsLen := len(table.buckets)
+	startIx := rand.IntN(bucketsLen)
+	for it := 0; it < bucketsLen; it++ {
+		ix := (startIx + it) & (bucketsLen - 1)
+		rootb := &table.buckets[ix]
+
 		b := rootb
 		// Prevent concurrent modifications and copy all entries into
 		// the intermediate slice.
@@ -1044,8 +1050,11 @@ func (m *Map[K, V]) All() iter.Seq2[K, V] {
 // most once, see [Range].
 func (m *Map[K, V]) RangeRelaxed(f func(key K, value V) bool) {
 	table := m.table.Load()
-	for i := range table.buckets {
-		b := &table.buckets[i]
+	bucketsLen := len(table.buckets)
+	startIx := rand.IntN(bucketsLen)
+	for i := range bucketsLen {
+		ix := (startIx + i) & (bucketsLen - 1)
+		b := &table.buckets[ix]
 		for {
 			metaw := atomic.LoadUint64(&b.meta)
 			markedw := metaw & occupiedMeta
@@ -1103,7 +1112,10 @@ func (m *Map[K, V]) DeleteMatching(f func(key K, value V) (delete, stop bool)) i
 	var anyBucketEmptied bool
 delete_loop_attempt:
 	table := m.table.Load()
-	for bidx := range table.buckets {
+	bucketsLen := len(table.buckets)
+	startIx := rand.IntN(bucketsLen)
+	for i := range bucketsLen {
+		bidx := (startIx + i) & (bucketsLen - 1)
 		rootb := &table.buckets[bidx]
 		rootb.mu.Lock()
 		// The following two checks must go in reverse to what's

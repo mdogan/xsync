@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"hash/maphash"
 	"math"
+	"math/rand/v2"
 	"runtime"
 	"strings"
 	"sync"
@@ -833,8 +834,13 @@ func (m *Map[K, V]) Range(f func(key K, value V) bool) {
 	// Pre-allocate array big enough to fit entries for most hash tables.
 	bentries := make([]*entry[K, V], 0, 16*entriesPerMapBucket)
 	table := m.table.Load()
-	for i := range table.buckets {
-		rootb := &table.buckets[i]
+
+	bucketsLen := len(table.buckets)
+	startIx := rand.IntN(bucketsLen)
+	for it := 0; it < bucketsLen; it++ {
+		ix := (startIx + it) % bucketsLen
+		rootb := &table.buckets[ix]
+
 		b := rootb
 		// Prevent concurrent modifications and copy all entries into
 		// the intermediate slice.
